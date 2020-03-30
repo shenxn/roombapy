@@ -4,6 +4,14 @@ import os.path
 import paho.mqtt.client as mqtt
 
 
+class RoombaInvalidAuth(Exception):
+    pass
+
+
+class RoombaConnectionException(Exception):
+    pass
+
+
 class RoombaMQTTClient:
     address = None
     port = None
@@ -12,6 +20,8 @@ class RoombaMQTTClient:
     cert_path = None
     log = None
     was_connected = False
+    on_connect = None
+    on_disconnect = None
 
     def __init__(self, address, blid, password, cert_path=None, port=8883):
         self.address = address
@@ -26,7 +36,7 @@ class RoombaMQTTClient:
         self.mqtt_client.on_message = on_message
 
     def set_on_connect(self, on_connect):
-        self.mqtt_client.on_connect = on_connect
+        self.on_connect = on_connect
 
     def set_on_publish(self, on_publish):
         self.mqtt_client.on_publish = on_publish
@@ -35,7 +45,7 @@ class RoombaMQTTClient:
         self.mqtt_client.on_subscribe = on_subscribe
 
     def set_on_disconnect(self, on_disconnect):
-        self.mqtt_client.on_disconnect = on_disconnect
+        self.on_disconnect = on_disconnect
 
     def connect(self):
         if not self.was_connected:
@@ -68,6 +78,8 @@ class RoombaMQTTClient:
     def _get_mqtt_client(self):
         mqtt_client = mqtt.Client(client_id=self.blid)
         mqtt_client.username_pw_set(username=self.blid, password=self.password)
+        mqtt_client.on_connect = self._internal_on_connect
+        mqtt_client.on_disconnect = self._internal_on_disconnect
 
         if not self.cert_path:
             return mqtt_client
@@ -91,3 +103,26 @@ class RoombaMQTTClient:
         mqtt_client.tls_insecure_set(True)
 
         return mqtt_client
+
+    def _internal_on_connect(self, client, userdata, flags, rc):
+        self.log.info("Connected to Roomba %s, response code = %s", self.address, rc)
+        self._validate_response_code(rc)
+        if self.on_connect is not None:
+            self.on_connect()
+
+    def _internal_on_disconnect(self, client, userdata, flags, rc):
+        self.log.info("Disconnected from Roomba %s, response code = %s", self.address, rc)
+        try:
+            self._validate_response_code(rc)
+        finally:
+            if self.on_disconnect is not None:
+                self.on_disconnect()
+
+    @staticmethod
+    def _validate_response_code(response_code):
+        if response_code == 0:
+            return
+        elif response_code == 4:
+            raise RoombaInvalidAuth("Connection exception - bad username or password")
+        else:
+            raise RoombaConnectionException("Connection exception, response code = " + str(response_code))

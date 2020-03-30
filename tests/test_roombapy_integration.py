@@ -41,10 +41,24 @@ class TestRoombaIntegration(abstract_test_roomba.AbstractTestRoomba):
         # then
         assert is_connected
 
+    @pytest.mark.asyncio
+    async def test_roomba_connect_error(self, broker, event_loop):
+        # given
+        roomba = self.get_default_roomba(blid='wrong')
+
+        # when
+        await self.start_broker(broker, event_loop)
+        is_connected = await self.roomba_connect(roomba, event_loop)
+        await self.roomba_disconnect(roomba)
+        await self.stop_broker(broker, event_loop)
+
+        # then
+        assert not is_connected
+
     async def roomba_connect(self, roomba, loop):
         roomba.connect()
         await asyncio.sleep(1, loop=loop)
-        return roomba.client.mqtt_client.is_connected()
+        return roomba.roomba_connected
 
     async def roomba_disconnect(self, roomba):
         roomba.disconnect()
