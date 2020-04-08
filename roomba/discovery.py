@@ -1,0 +1,67 @@
+import socket
+import json
+import logging
+
+UDP_BIND_ADDRESS = ''
+UDP_ADDRESS = '<broadcast>'
+UDP_PORT = 5678
+MESSAGE = 'irobotmcs'
+
+
+class RoombaDiscoveryInfo:
+    def __init__(self, robot_name, ip, mac, firmware):
+        self.firmware = firmware
+        self.mac = mac
+        self.ip = ip
+        self.robot_name = robot_name
+
+
+class RoombaDiscovery:
+    server_socket = None
+    log = None
+
+    def __init__(self):
+        self.server_socket = self._get_socket()
+        self.log = logging.getLogger(__name__)
+
+    def find(self):
+        self._start_server()
+        self.log.debug("Socket server started, port %s", UDP_PORT)
+        self._broadcast_message()
+        self.log.debug("Broadcast message sent")
+        return self._get_response()
+
+    def _get_response(self):
+        try:
+            while True:
+                raw_response, addr = self.server_socket.recvfrom(1024)
+                self.log.debug("Received: response: %s, address: %s", raw_response, addr)
+                data = raw_response.decode()
+                if data != MESSAGE:
+                    return self._decode_data(data)
+        except socket.timeout:
+            return None
+
+    def _broadcast_message(self):
+        self.server_socket.sendto(MESSAGE.encode(), (UDP_ADDRESS, UDP_PORT))
+
+    def _start_server(self):
+        self.server_socket.bind((UDP_BIND_ADDRESS, UDP_PORT))
+
+    @staticmethod
+    def _decode_data(data):
+        json_response = json.loads(data)
+        if 'Roomba' not in json_response['hostname']:
+            raise Exception('not Roomba response')
+        return RoombaDiscoveryInfo(
+            robot_name=json_response['robotname'],
+            ip=json_response['ip'],
+            mac=json_response['mac'],
+            firmware=json_response['sw'])
+
+    @staticmethod
+    def _get_socket():
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        server_socket.settimeout(2)
+        return server_socket
