@@ -2,11 +2,6 @@ import socket
 import json
 import logging
 
-UDP_BIND_ADDRESS = ''
-UDP_ADDRESS = '<broadcast>'
-UDP_PORT = 5678
-MESSAGE = 'irobotmcs'
-
 
 class RoombaDiscoveryInfo:
     def __init__(self, robot_name, ip, mac, firmware):
@@ -17,6 +12,10 @@ class RoombaDiscoveryInfo:
 
 
 class RoombaDiscovery:
+    udp_bind_address = ''
+    udp_address = '<broadcast>'
+    udp_port = 5678
+    broadcast_message = 'irobotmcs'
     server_socket = None
     log = None
 
@@ -26,7 +25,7 @@ class RoombaDiscovery:
 
     def find(self):
         self._start_server()
-        self.log.debug("Socket server started, port %s", UDP_PORT)
+        self.log.debug("Socket server started, port %s", self.udp_port)
         self._broadcast_message()
         self.log.debug("Broadcast message sent")
         return self._get_response()
@@ -37,16 +36,16 @@ class RoombaDiscovery:
                 raw_response, addr = self.server_socket.recvfrom(1024)
                 self.log.debug("Received: response: %s, address: %s", raw_response, addr)
                 data = raw_response.decode()
-                if data != MESSAGE:
+                if data != self.broadcast_message:
                     return self._decode_data(data)
         except socket.timeout:
             return None
 
     def _broadcast_message(self):
-        self.server_socket.sendto(MESSAGE.encode(), (UDP_ADDRESS, UDP_PORT))
+        self.server_socket.sendto(self.broadcast_message.encode(), (self.udp_address, self.udp_port))
 
     def _start_server(self):
-        self.server_socket.bind((UDP_BIND_ADDRESS, UDP_PORT))
+        self.server_socket.bind((self.udp_bind_address, self.udp_port))
 
     @staticmethod
     def _decode_data(data):
