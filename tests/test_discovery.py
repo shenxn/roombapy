@@ -1,4 +1,4 @@
-from roomba.discovery import RoombaDiscovery, RoombaDiscoveryInfo
+from roomba.discovery import RoombaDiscovery
 
 
 class TestDiscovery:
