@@ -14,7 +14,8 @@ setup(
     include_package_data=True,
     entry_points={
         "console_scripts": [
-            "roomba=roomba.__main__:main"
+            "roomba-discovery=roomba.entry_points:discovery",
+            "roomba-password=roomba.entry_points:password"
         ]
     },
 )

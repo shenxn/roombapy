@@ -2,24 +2,14 @@ import socket
 import json
 import logging
 
-
-class RoombaDiscoveryInfo:
-    def __init__(self, hostname, robot_name, ip, mac, firmware, sku, capabilities):
-        self.hostname = hostname
-        self.firmware = firmware
-        self.mac = mac
-        self.ip = ip
-        self.robot_name = robot_name
-        self.blid = hostname.split('-')[1]
-        self.sku = sku
-        self.capabilities = capabilities
+from roomba.roomba import RoombaInfo
 
 
 class RoombaDiscovery:
     udp_bind_address = ''
     udp_address = '<broadcast>'
     udp_port = 5678
-    broadcast_message = 'irobotmcs'
+    roomba_message = 'irobotmcs'
     server_socket = None
     log = None
 
@@ -30,6 +20,11 @@ class RoombaDiscovery:
     def find(self):
         self._start_server()
         self._broadcast_message()
+        return self._get_response()
+
+    def get_info(self, ip):
+        self._start_server()
+        self._send_message(ip)
         return self._get_response()
 
     def _get_response(self):
@@ -45,7 +40,7 @@ class RoombaDiscovery:
             return None
 
     def _is_from_irobot(self, data):
-        if data == self.broadcast_message:
+        if data == self.roomba_message:
             return False
 
         json_response = json.loads(data)
@@ -55,8 +50,12 @@ class RoombaDiscovery:
         return False
 
     def _broadcast_message(self):
-        self.server_socket.sendto(self.broadcast_message.encode(), (self.udp_address, self.udp_port))
+        self.server_socket.sendto(self.roomba_message.encode(), (self.udp_address, self.udp_port))
         self.log.debug("Broadcast message sent")
+
+    def _send_message(self, udp_address):
+        self.server_socket.sendto(self.roomba_message.encode(), (udp_address, self.udp_port))
+        self.log.debug("Message sent")
 
     def _start_server(self):
         self.server_socket.bind((self.udp_bind_address, self.udp_port))
@@ -65,7 +64,7 @@ class RoombaDiscovery:
     @staticmethod
     def _decode_data(data):
         json_response = json.loads(data)
-        return RoombaDiscoveryInfo(
+        return RoombaInfo(
             hostname=json_response['hostname'],
             robot_name=json_response['robotname'],
             ip=json_response['ip'],

@@ -8,7 +8,7 @@ class TestDiscovery:
         discovery = RoombaDiscovery()
 
         # when
-        discovery.broadcast_message = 'test'
+        discovery.roomba_message = 'test'
         response = discovery.find()
 
         # then
