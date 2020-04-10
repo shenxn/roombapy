@@ -155,7 +155,6 @@ class Roomba:
         self.stop_connection = False
         self.periodic_connection_running = False
         self.topic = '#'
-        self.mqttc = None
         self.brokerFeedback = ''
         self.exclude = ''
         self.delay = delay
@@ -163,7 +162,6 @@ class Roomba:
         self.roomba_connected = False
         self.indent = 0
         self.master_indent = 0
-        self.raw = False
         self.co_ords = {"x": 0, "y": 0, "theta": 180}
         self.cleanMissionStatus_phase = ''
         self.previous_cleanMissionStatus_phase = ''
@@ -182,9 +180,9 @@ class Roomba:
             password=password,
             cert_path=cert_path)
         client.set_on_message(self.on_message)
-        client.set_on_connect(self.on_successful_connect)
+        client.set_on_connect(self.on_connect)
         client.set_on_subscribe(self.on_subscribe)
-        client.set_on_disconnect(self.on_successful_disconnect)
+        client.set_on_disconnect(self.on_disconnect)
         return client
 
     def connect(self):
@@ -193,8 +191,6 @@ class Roomba:
 
         if self.continuous:
             if not self._connect():
-                if self.mqttc is not None:
-                    self.mqttc.disconnect()
                 raise Exception("failed to connect!")
         else:
             self._thread.daemon = True
@@ -237,31 +233,23 @@ class Roomba:
         self.client.disconnect()
         self.periodic_connection_running = False
 
-    def on_successful_connect(self):
+    def on_connect(self, error):
+        self.log.info("Connected to Roomba %s", self.address)
+        if error is not None:
+            self.log.error("Roomba Connected with result code %s", error)
+            self.log.error("Please make sure your blid and password are correct %s", self.address)
+            raise Exception("Failure in on_connect")
+
         self.roomba_connected = True
         self.client.subscribe(self.topic)
 
-    def on_connect(self, client, userdata, flags, rc):
-        self.log.info("Connected to Roomba %s", self.address)
-        if rc == 0:
-            self.roomba_connected = True
-            self.client.subscribe(self.topic)
-        else:
-            self.log.error("Roomba Connected with result code %s", str(rc))
-            self.log.error("Please make sure your blid and password are correct %s", self.address)
-            if self.mqttc is not None:
-                self.mqttc.disconnect()
-            raise Exception("Failure in on_connect")
-
-    def on_successful_disconnect(self):
+    def on_disconnect(self, error):
         self.roomba_connected = False
-
-    def on_disconnect(self, mosq, obj, rc):
-        self.roomba_connected = False
-        if rc != 0:
+        if error is not None:
             self.log.warning("Unexpectedly disconnected from Roomba %s! - reconnecting", self.address)
-        else:
-            self.log.info("Disconnected from Roomba %s", self.address)
+            return
+
+        self.log.info("Disconnected from Roomba %s", self.address)
 
     def on_message(self, mosq, obj, msg):
         # print("on_message", msg.topic + " " + str(msg.qos) + " " + str(msg.payload))
@@ -277,10 +265,7 @@ class Roomba:
 
         self.log.debug("Received Roomba Data %s: %s, %s", self.address, str(msg.topic), str(msg.payload))
 
-        if self.raw:
-            self.publish(msg.topic, msg.payload)
-        else:
-            self.decode_topics(json_data)
+        self.decode_topics(json_data)
 
         # default every 5 minutes
         if time.time() - self.time > self.update_seconds:
@@ -319,9 +304,7 @@ class Roomba:
         self.client.publish("delta", str_command)
 
     def publish(self, topic, message):
-        if self.mqttc is not None and message is not None:
-            self.log.debug("Publishing item: %s: %s" % (self.brokerFeedback + "/" + topic, message))
-            self.mqttc.publish(self.brokerFeedback + "/" + topic, message)
+        pass
 
     def to_timestamp(self, dt):
         td = dt - datetime.datetime(1970, 1, 1)
@@ -339,9 +322,9 @@ class Roomba:
         """
         for k, v in merge_dct.items():
             if (
-                    k in dct
-                    and isinstance(dct[k], dict)
-                    and isinstance(merge_dct[k], Mapping)
+                k in dct
+                and isinstance(dct[k], dict)
+                and isinstance(merge_dct[k], Mapping)
             ):
                 self.dict_merge(dct[k], merge_dct[k])
             else:
@@ -360,9 +343,9 @@ class Roomba:
             # order), else return as is...
             json_data = json.loads(
                 payload.decode("utf-8")
-                    .replace(":nan", ":NaN")
-                    .replace(":inf", ":Infinity")
-                    .replace(":-inf", ":-Infinity"),
+                .replace(":nan", ":NaN")
+                .replace(":inf", ":Infinity")
+                .replace(":-inf", ":-Infinity"),
                 object_pairs_hook=OrderedDict,
             )
             # if it's not a dictionary, probably just a number
@@ -377,10 +360,6 @@ class Roomba:
 
         except ValueError:
             formatted_data = payload
-
-        if self.raw:
-            formatted_data = payload
-
         return formatted_data, dict(json_data)
 
     def decode_topics(self, state, prefix=None):
@@ -421,20 +400,11 @@ class Roomba:
                     self.co_ords["x"] = v
                 if k == "bin_full":
                     self.bin_full = v
-                if k == "cleanMissionStatus_error":
-                    try:
-                        error_message = self._ErrorMessages[v]
-                    except KeyError as e:
-                        self.log.warning("Error looking up Roomba error " "message: %s", e)
-                        error_message = "Unknown Error number: %d" % v
-                    self.publish("error_message", error_message)
                 if k == "cleanMissionStatus_phase":
                     self.previous_cleanMissionStatus_phase = (
                         self.cleanMissionStatus_phase
                     )
                     self.cleanMissionStatus_phase = v
-
-                self.publish(k, str(v))
 
         if prefix is None:
             self.update_state_machine()
@@ -580,5 +550,3 @@ class Roomba:
 
         if self.current_state != current_mission:
             self.log.debug("State updated to: %s", self.current_state)
-
-        self.publish("state", self.current_state)

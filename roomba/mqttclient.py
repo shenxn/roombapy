@@ -1,15 +1,16 @@
 import logging
 import ssl
 import os.path
+from enum import Enum
 import paho.mqtt.client as mqtt
 
 
-class RoombaInvalidAuth(Exception):
-    pass
-
-
-class RoombaConnectionException(Exception):
-    pass
+class RoombaMQTTError(Enum):
+    BAD_PROTOCOL = 1
+    BAD_CLIENT_ID = 2
+    SERVER_UNAVAILABLE = 3
+    BAD_USERNAME_OR_PASSWORD = 4
+    NOT_AUTHORISED = 5
 
 
 class RoombaMQTTClient:
@@ -106,23 +107,19 @@ class RoombaMQTTClient:
 
     def _internal_on_connect(self, client, userdata, flags, rc):
         self.log.info("Connected to Roomba %s, response code = %s", self.address, rc)
-        self._validate_response_code(rc)
+        connection_error = self._find_connection_error(rc)
         if self.on_connect is not None:
-            self.on_connect()
+            self.on_connect(connection_error)
 
     def _internal_on_disconnect(self, client, userdata, flags, rc):
         self.log.info("Disconnected from Roomba %s, response code = %s", self.address, rc)
-        try:
-            self._validate_response_code(rc)
-        finally:
-            if self.on_disconnect is not None:
-                self.on_disconnect()
+        connection_error = self._find_connection_error(rc)
+        if self.on_disconnect is not None:
+            self.on_disconnect(connection_error)
 
     @staticmethod
-    def _validate_response_code(response_code):
+    def _find_connection_error(response_code):
         if response_code == 0:
-            return
-        elif response_code == 4:
-            raise RoombaInvalidAuth("Connection exception - bad username or password")
+            return None
         else:
-            raise RoombaConnectionException("Connection exception, response code = " + str(response_code))
+            return RoombaMQTTError(response_code)
