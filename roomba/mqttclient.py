@@ -61,20 +61,11 @@ class RoombaMQTTClient:
     def disconnect(self):
         self.mqtt_client.disconnect()
 
-    def loop_start(self):
-        self.mqtt_client.loop_start()
-
-    def loop_stop(self):
-        self.mqtt_client.loop_stop()
-
     def subscribe(self, topic):
         self.mqtt_client.subscribe(topic)
 
     def publish(self, topic, payload):
         self.mqtt_client.publish(topic, payload)
-
-    def get_address(self):
-        return self.address
 
     def _get_mqtt_client(self):
         mqtt_client = mqtt.Client(client_id=self.blid)
