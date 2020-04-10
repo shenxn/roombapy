@@ -4,13 +4,15 @@ import logging
 
 
 class RoombaDiscoveryInfo:
-    def __init__(self, hostname, robot_name, ip, mac, firmware):
+    def __init__(self, hostname, robot_name, ip, mac, firmware, sku, capabilities):
         self.hostname = hostname
         self.firmware = firmware
         self.mac = mac
         self.ip = ip
         self.robot_name = robot_name
         self.blid = hostname.split('-')[1]
+        self.sku = sku
+        self.capabilities = capabilities
 
 
 class RoombaDiscovery:
@@ -68,7 +70,9 @@ class RoombaDiscovery:
             robot_name=json_response['robotname'],
             ip=json_response['ip'],
             mac=json_response['mac'],
-            firmware=json_response['sw'])
+            firmware=json_response['sw'],
+            sku=json_response['sku'],
+            capabilities=json_response['cap'])
 
     @staticmethod
     def _get_socket():
