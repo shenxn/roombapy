@@ -27,20 +27,19 @@ class RoombaDiscovery:
 
     def find(self):
         self._start_server()
-        self.log.debug("Socket server started, port %s", self.udp_port)
         self._broadcast_message()
-        self.log.debug("Broadcast message sent")
         return self._get_response()
 
     def _get_response(self):
         try:
             while True:
                 raw_response, addr = self.server_socket.recvfrom(1024)
-                self.log.debug("Received: response: %s, address: %s", raw_response, addr)
+                self.log.debug("Received response: %s, address: %s", raw_response, addr)
                 data = raw_response.decode()
                 if self._is_from_irobot(data):
                     return self._decode_data(data)
         except socket.timeout:
+            self.log.warning('Socket timeout')
             return None
 
     def _is_from_irobot(self, data):
@@ -55,9 +54,11 @@ class RoombaDiscovery:
 
     def _broadcast_message(self):
         self.server_socket.sendto(self.broadcast_message.encode(), (self.udp_address, self.udp_port))
+        self.log.debug("Broadcast message sent")
 
     def _start_server(self):
         self.server_socket.bind((self.udp_bind_address, self.udp_port))
+        self.log.debug("Socket server started, port %s", self.udp_port)
 
     @staticmethod
     def _decode_data(data):
