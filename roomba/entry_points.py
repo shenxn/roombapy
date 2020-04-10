@@ -10,9 +10,14 @@ def discovery():
 def password():
     roomba_info = _get_roomba_info()
     _wait_for_input()
-    roomba_password = RoombaPassword(roomba_info)
-    roomba_info = roomba_password.get_password()
+    roomba_password = _get_roomba_password(roomba_info)
+    roomba_info.password = roomba_password
     print(roomba_info)
+
+
+def _get_roomba_password(roomba_info):
+    roomba_password = RoombaPassword(roomba_info.ip)
+    return roomba_password.get_password()
 
 
 def _wait_for_input():

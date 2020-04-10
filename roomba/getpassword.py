@@ -2,18 +2,17 @@ import socket
 import ssl
 import logging
 import struct
-import copy
 
 
 class RoombaPassword:
-    roomba_info = None
+    roomba_ip = None
     roomba_port = 8883
     message = None
     server_socket = None
     log = None
 
-    def __init__(self, roomba_info):
-        self.roomba_info = roomba_info
+    def __init__(self, roomba_ip):
+        self.roomba_ip = roomba_ip
         self.message = bytes.fromhex('f005efcc3b2900')
         self.server_socket = self._get_socket()
         self.log = logging.getLogger(__name__)
@@ -29,12 +28,11 @@ class RoombaPassword:
         self._connect()
         self._send_message()
         response = self._get_response()
-        password = self._decode_password(response)
-        return self._get_roomba_info_with_password(password)
+        return self._decode_password(response)
 
     def _connect(self):
-        self.server_socket.connect((self.roomba_info.ip, self.roomba_port))
-        self.log.debug('Connected to Roomba %s:%s', self.roomba_info.ip, self.roomba_port)
+        self.server_socket.connect((self.roomba_ip, self.roomba_port))
+        self.log.debug('Connected to Roomba %s:%s', self.roomba_ip, self.roomba_port)
 
     def _send_message(self):
         self.server_socket.send(self.message)
@@ -64,11 +62,6 @@ class RoombaPassword:
         except socket.error as e:
             self.log.debug('Socket error', e)
             return None
-
-    def _get_roomba_info_with_password(self, password):
-        copied_roomba_info = copy.deepcopy(self.roomba_info)
-        copied_roomba_info.password = password
-        return copied_roomba_info
 
     @staticmethod
     def _decode_password(data):
