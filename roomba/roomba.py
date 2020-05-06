@@ -186,6 +186,7 @@ class Roomba:
         self.periodic_connection_running = False
         self.topic = '#'
         self.exclude = ''
+        self.exclude_wifistat = False
         self.delay = delay
         self.periodic_connection_duration = 10
         self.roomba_connected = False
@@ -295,6 +296,12 @@ class Roomba:
             self.master_indent = max(self.master_indent, len(msg.topic))
 
         log_string, json_data = self.decode_payload(msg.topic, msg.payload)
+
+        # Fix roomba 980 position reporting bug (home-assistant/core#35120)
+        if self.exclude_wifistat:
+            if "wifistat" in msg.topic and "pose" not in json_data.get("state", {}).get("reported", {}):
+                return
+
         self.dict_merge(self.master_state, json_data)
 
         self.log.debug("Received Roomba Data %s: %s, %s", self.address, str(msg.topic), str(msg.payload))
